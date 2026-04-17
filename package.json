@@ -1,0 +1,28 @@
+{
+  "name": "cc-usage-widget",
+  "version": "1.0.0",
+  "description": "Floating desktop widget and terminal dashboard that show your Claude Code usage (session, weekly, extra). No API tokens required — it reuses your local `claude` login.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "script": "node get_usage.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "usage",
+    "widget",
+    "electron",
+    "dashboard"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11"
+  }
+}

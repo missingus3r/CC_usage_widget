@@ -1,0 +1,98 @@
+# Claude Code Usage Widget
+
+Two small tools that show your **Claude Code** usage in real time — current session %, weekly limits (all models + Sonnet only), and Extra Usage spend — with live countdowns to each reset.
+
+- A **terminal dashboard** (`get_usage.js`) that renders directly in your shell.
+- A **floating desktop widget** (Electron) that stays on top of your windows.
+
+No API keys, no tokens, no config files. It reuses the `claude` CLI session you already have logged in.
+
+---
+
+## Screenshots
+
+**Terminal dashboard (`node get_usage.js`)**
+
+![Terminal dashboard](script.png)
+
+**Floating desktop widget (`npm start`)**
+
+![Desktop widget](widget.png)
+
+---
+
+## How it works (the simple version)
+
+1. You already log in to Claude Code once with `claude` in a terminal.
+2. These tools spawn `claude` in a pseudo-terminal (via `node-pty`), type `/usage`, capture the rendered screen, and parse out the numbers.
+3. Data is refreshed every 30 minutes. Countdowns tick every second locally.
+
+That's it — no scraping of the API, no tokens handled by the app. If you can run `claude` in your terminal, these tools work.
+
+---
+
+## Setup
+
+### 1. Install and log in to Claude Code (one time)
+
+Install Claude Code following the official docs: https://docs.claude.com/claude-code
+
+Then open a terminal and run:
+
+```bash
+claude
+```
+
+Complete the login flow. From this point on, the widget and the script work on their own — **you never need to log in again or paste any token into this project**.
+
+### 2. Clone and install
+
+```bash
+git clone https://github.com/<your-user>/CC_usage_widget.git
+cd CC_usage_widget
+npm install
+```
+
+> Requires Node.js 18+. See [REQUIREMENTS.md](REQUIREMENTS.md) for details (including native-build toolchain notes for `node-pty`, if needed).
+
+### 3a. Run the terminal dashboard
+
+```bash
+node get_usage.js
+```
+
+You'll see the ANSI dashboard above. `Ctrl+C` to exit.
+
+### 3b. Run the floating desktop widget
+
+```bash
+npm start
+```
+
+An always-on-top frameless window appears in the top-right corner of your primary display.
+
+---
+
+## Project layout
+
+| File              | Purpose                                                     |
+| ----------------- | ----------------------------------------------------------- |
+| `get_usage.js`    | Standalone terminal dashboard.                              |
+| `fetcher.js`      | One-shot fetcher — runs `claude /usage` and prints JSON.    |
+| `main.js`         | Electron main process; spawns `fetcher.js` on a timer.      |
+| `preload.js`      | Electron preload bridging IPC to the renderer.              |
+| `renderer.js`     | Widget UI logic.                                            |
+| `index.html`      | Widget markup.                                              |
+| `styles.css`      | Widget styles.                                              |
+
+---
+
+## Notes / caveats
+
+- Each refresh spawns `claude` for ~20–25 seconds in the background to capture the `/usage` screen. This is intentional and cheap, but you'll see a short-lived child process appear.
+- The parser matches the current English `/usage` layout. If Anthropic changes the screen, the regexes in `fetcher.js` / `get_usage.js` may need a small update.
+- Countdowns are computed against `America/Buenos_Aires` (UTC−3), matching where `/usage` reports resets. Tweak `parseResetDate()` if you need a different zone.
+
+## License
+
+MIT

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Usage</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="widget">
+    <div class="titlebar">
+      <div class="titlebar-left">
+        <span class="titlebar-icon">☁</span>
+        <span class="titlebar-text">Claude Usage</span>
+      </div>
+      <div class="titlebar-controls">
+        <button class="btn-min" id="btn-min" title="Minimize">─</button>
+        <button class="btn-close" id="btn-close" title="Close">✕</button>
+      </div>
+    </div>
+
+    <div class="content" id="content">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span>Fetching usage data...</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span id="footer-updated">—</span>
+      <div class="footer-refresh">
+        <span id="footer-next">—</span>
+        <button class="refresh-btn" id="btn-refresh" title="Refresh now">↻</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
