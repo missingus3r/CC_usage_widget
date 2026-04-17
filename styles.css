@@ -178,6 +178,43 @@ body {
   margin-bottom: 12px;
 }
 
+/* ── Local tokens ─────────────────────────────── */
+.local-section {
+  margin-bottom: 6px;
+}
+
+.local-row {
+  margin-top: 6px;
+}
+
+.local-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.local-row-label {
+  color: #a1a1aa;
+  font-weight: 500;
+}
+
+.local-row-total {
+  color: #e4e4e7;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.local-row-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 3px;
+  font-size: 10.5px;
+  color: #71717a;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Divider ──────────────────────────────────── */
 .divider {
   height: 1px;

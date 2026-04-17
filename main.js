@@ -3,6 +3,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { spawn } = require('child_process');
 const { loadConfig } = require('./config');
+const { readLocalUsage } = require('./localUsage');
 
 let win = null;
 let tray = null;
@@ -170,7 +171,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 340,
-    height: 520,
+    height: 620,
     x: screenW - 360,
     y: 20,
     frame: false,
@@ -198,6 +199,7 @@ function createWindow() {
 
 // ── IPC ────────────────────────────────────────────────────────
 ipcMain.handle('fetch-usage', () => fetchUsage());
+ipcMain.handle('fetch-local-usage', () => readLocalUsage());
 ipcMain.handle('get-config', () => loadConfig());
 ipcMain.on('window-minimize', () => { if (win) win.hide(); });
 ipcMain.on('window-close', () => { if (win) win.hide(); });

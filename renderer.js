@@ -1,5 +1,6 @@
 // ── State ──────────────────────────────────────────────────────
 let usageData = null;
+let localUsage = null;
 let lastFetch = null;
 let REFRESH_MS = 15 * 60 * 1000; // overwritten from config at startup
 let tickInterval = null;
@@ -85,6 +86,16 @@ function pctColor(pct) {
   return '#4ade80';
 }
 
+// ── Number formatter (compact) ─────────────────────────────────
+function fmtNum(n) {
+  if (n == null || !isFinite(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
 // ── Build sections HTML (static parts) ─────────────────────────
 function buildSections() {
   if (!usageData) return;
@@ -100,7 +111,6 @@ function buildSections() {
         </div>
         <div class="bar-track"><div class="bar-fill ${barClass(usageData.session.pct)}" style="width:${usageData.session.pct}%"></div></div>
         <div class="countdown">
-          <span class="countdown-icon">⏱</span>
           Resets in <span class="countdown-value" id="cd-session">—</span>
         </div>
       </div>`;
@@ -115,7 +125,6 @@ function buildSections() {
         </div>
         <div class="bar-track"><div class="bar-fill ${barClass(usageData.weekAll.pct)}" style="width:${usageData.weekAll.pct}%"></div></div>
         <div class="countdown">
-          <span class="countdown-icon">⏱</span>
           Resets in <span class="countdown-value" id="cd-week">—</span>
         </div>
       </div>`;
@@ -144,7 +153,6 @@ function buildSections() {
           <span class="spent-value">$${usageData.extra.spent}</span> / $${usageData.extra.total} spent
         </div>
         <div class="countdown">
-          <span class="countdown-icon">⏱</span>
           Resets in <span class="countdown-value" id="cd-extra">—</span>
         </div>
       </div>`;
@@ -153,6 +161,35 @@ function buildSections() {
   if (usageData.insight) {
     html += `<div class="divider"></div>`;
     html += `<div class="insight"><span>⚡</span><span>${usageData.insight}</span></div>`;
+  }
+
+  if (localUsage) {
+    const row = (label, t) => {
+      const total = t.input + t.output + t.cacheRead + t.cacheCreate;
+      return `
+        <div class="local-row">
+          <div class="local-row-head">
+            <span class="local-row-label">${label}</span>
+            <span class="local-row-total">${fmtNum(total)}</span>
+          </div>
+          <div class="local-row-breakdown">
+            <span>in ${fmtNum(t.input)}</span>
+            <span>out ${fmtNum(t.output)}</span>
+            <span>cache ${fmtNum(t.cacheRead + t.cacheCreate)}</span>
+            <span>${t.messages} msgs</span>
+          </div>
+        </div>`;
+    };
+
+    html += `<div class="divider"></div>`;
+    html += `
+      <div class="section local-section">
+        <div class="section-header">
+          <span class="section-label">Local Tokens</span>
+        </div>
+        ${row('Today', localUsage.today)}
+        ${row('7 days', localUsage.week)}
+      </div>`;
   }
 
   content.innerHTML = html;
@@ -202,10 +239,15 @@ async function doFetch() {
     loading.style.display = 'flex';
   }
 
-  const data = await window.api.fetchUsage();
+  const [data, local] = await Promise.all([
+    window.api.fetchUsage(),
+    window.api.fetchLocalUsage().catch(() => null),
+  ]);
 
   btnRefresh.classList.remove('spinning');
   fetching = false;
+
+  if (local) localUsage = local;
 
   if (data) {
     usageData = data;
@@ -221,6 +263,9 @@ async function doFetch() {
   } else if (!usageData) {
     loading.querySelector('span').textContent = 'Could not fetch data. Retrying...';
     setTimeout(doFetch, 10000);
+  } else if (local) {
+    buildSections();
+    tick();
   }
 }
 
