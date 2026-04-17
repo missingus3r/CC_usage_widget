@@ -217,6 +217,7 @@ async function doFetch() {
 
     buildSections();
     tick();
+    window.api.sendUsage(data);
   } else if (!usageData) {
     loading.querySelector('span').textContent = 'Could not fetch data. Retrying...';
     setTimeout(doFetch, 10000);
@@ -224,6 +225,7 @@ async function doFetch() {
 }
 
 // ── Init ───────────────────────────────────────────────────────
+window.api.onRefresh(() => doFetch());
 doFetch();
 tickInterval = setInterval(tick, 1000);
 setInterval(doFetch, REFRESH_MS);

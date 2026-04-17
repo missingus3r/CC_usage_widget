@@ -3,7 +3,7 @@
 Two small tools that show your **Claude Code** usage in real time — current session %, weekly limits (all models + Sonnet only), and Extra Usage spend — with live countdowns to each reset.
 
 - A **terminal dashboard** (`get_usage.js`) that renders directly in your shell.
-- A **floating desktop widget** (Electron) that stays on top of your windows.
+- A **floating desktop widget** (Electron) that stays on top of your windows. Includes a **system tray icon** with two live bars (session % on top, weekly % on bottom) and a tooltip/menu showing the exact numbers.
 
 No API keys, no tokens, no config files. It reuses the `claude` CLI session you already have logged in.
 
@@ -69,7 +69,7 @@ You'll see the ANSI dashboard above. `Ctrl+C` to exit.
 npm start
 ```
 
-An always-on-top frameless window appears in the top-right corner of your primary display.
+An always-on-top frameless window appears in the top-right corner of your primary display, plus a tray icon next to the clock. The tray icon draws two horizontal bars (session % and weekly %), and the tooltip/right-click menu shows the exact numbers. Closing the widget window hides it to tray — use the tray's **Quit** entry to fully exit.
 
 ---
 
