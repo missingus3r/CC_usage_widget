@@ -1,7 +1,7 @@
 // ── State ──────────────────────────────────────────────────────
 let usageData = null;
 let lastFetch = null;
-const REFRESH_MS = 30 * 60 * 1000;
+let REFRESH_MS = 15 * 60 * 1000; // overwritten from config at startup
 let tickInterval = null;
 let fetching = false;
 // Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
@@ -225,7 +225,13 @@ async function doFetch() {
 }
 
 // ── Init ───────────────────────────────────────────────────────
-window.api.onRefresh(() => doFetch());
-doFetch();
-tickInterval = setInterval(tick, 1000);
-setInterval(doFetch, REFRESH_MS);
+(async () => {
+  try {
+    const cfg = await window.api.getConfig();
+    if (cfg?.refreshMinutes > 0) REFRESH_MS = cfg.refreshMinutes * 60 * 1000;
+  } catch {}
+  window.api.onRefresh(() => doFetch());
+  doFetch();
+  tickInterval = setInterval(tick, 1000);
+  setInterval(doFetch, REFRESH_MS);
+})();

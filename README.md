@@ -25,9 +25,21 @@ No API keys, no tokens, no config files. It reuses the `claude` CLI session you 
 
 1. You already log in to Claude Code once with `claude` in a terminal.
 2. These tools spawn `claude` in a pseudo-terminal (via `node-pty`), type `/usage`, capture the rendered screen, and parse out the numbers.
-3. Data is refreshed every 30 minutes. Countdowns tick every second locally.
+3. Data is refreshed every N minutes (default 15, configurable — see below). Countdowns tick every second locally and force an immediate refresh the moment any of them reaches zero.
 
 That's it — no scraping of the API, no tokens handled by the app. If you can run `claude` in your terminal, these tools work.
+
+### Configuration
+
+Edit `config.json` in the project root:
+
+```json
+{
+  "refreshMinutes": 15
+}
+```
+
+Both the terminal script and the widget (main + renderer) read this file at startup. Restart the tool after changing it.
 
 ---
 

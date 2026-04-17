@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } = require
 const path = require('path');
 const zlib = require('zlib');
 const { spawn } = require('child_process');
+const { loadConfig } = require('./config');
 
 let win = null;
 let tray = null;
@@ -197,6 +198,7 @@ function createWindow() {
 
 // ── IPC ────────────────────────────────────────────────────────
 ipcMain.handle('fetch-usage', () => fetchUsage());
+ipcMain.handle('get-config', () => loadConfig());
 ipcMain.on('window-minimize', () => { if (win) win.hide(); });
 ipcMain.on('window-close', () => { if (win) win.hide(); });
 ipcMain.on('usage-updated', (_event, data) => {

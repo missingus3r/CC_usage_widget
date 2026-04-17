@@ -2,6 +2,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const { loadConfig } = require('./config');
 
 let pty;
 try {
@@ -41,7 +42,7 @@ if (!CLAUDE_PATH) {
 let usageData = null;   // parsed data from last fetch
 let lastFetch = null;   // Date of last successful fetch
 let fetching = false;
-const REFRESH_MS = 30 * 60 * 1000; // 30 minutes
+const REFRESH_MS = loadConfig().refreshMinutes * 60 * 1000;
 // Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
 // so a countdown that sits at "Now!" doesn't re-trigger every tick.
 const firedResets = new Set();
