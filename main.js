@@ -171,14 +171,14 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 340,
-    height: 620,
+    height: 720,
     x: screenW - 360,
     y: 20,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
     hasShadow: true,
     backgroundColor: '#00000000',
     webPreferences: {

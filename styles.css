@@ -184,7 +184,10 @@ body {
 }
 
 .local-row {
-  margin-top: 6px;
+  margin-top: 10px;
+}
+.local-row:first-of-type {
+  margin-top: 4px;
 }
 
 .local-row-head {
@@ -197,23 +200,137 @@ body {
 .local-row-label {
   color: #a1a1aa;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10.5px;
 }
 
 .local-row-total {
   color: #e4e4e7;
   font-weight: 700;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.local-row-breakdown {
+/* Stacked composition bar */
+.local-stacked-bar {
+  display: flex;
+  width: 100%;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.local-stacked-bar.empty { background: rgba(255, 255, 255, 0.04); }
+
+.local-stacked-bar .seg {
+  height: 100%;
+  min-width: 0;
+  transition: width 0.5s ease;
+}
+.local-stacked-bar .seg:not(:empty):first-child,
+.local-stacked-bar .seg:first-of-type { /* ensure tiny segments still render */ }
+.seg-in    { background: linear-gradient(90deg, #f472b6, #fb7185); }
+.seg-out   { background: linear-gradient(90deg, #38bdf8, #60a5fa); }
+.seg-cache { background: linear-gradient(90deg, #a78bfa, #c084fc); }
+
+/* Legend */
+.local-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 3px;
+  gap: 9px;
+  margin-top: 6px;
   font-size: 10.5px;
+  color: #a1a1aa;
+  font-variant-numeric: tabular-nums;
+}
+.local-legend .leg {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.local-legend b {
+  color: #e4e4e7;
+  font-weight: 600;
+}
+.local-legend .leg-msgs {
+  color: #71717a;
+  margin-left: auto;
+}
+
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+.dot-in    { background: #fb7185; color: rgba(251, 113, 133, 0.35); }
+.dot-out   { background: #60a5fa; color: rgba(96, 165, 250, 0.35); }
+.dot-cache { background: #a78bfa; color: rgba(167, 139, 250, 0.35); }
+
+/* Sparkline */
+.local-spark-title {
+  margin-top: 12px;
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.local-sparkline {
+  display: flex;
+  align-items: end;
+  gap: 5px;
+  height: 58px;
+}
+
+.spark-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+}
+
+.spark-track {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 3px;
+  padding: 2px;
+}
+
+.spark-bar {
+  flex: 1;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.4s ease;
+}
+.spark-bar-tok { background: linear-gradient(180deg, #a78bfa, #7c3aed); }
+.spark-bar-msg { background: linear-gradient(180deg, #38bdf8, #0284c7); }
+
+.spark-today .spark-track {
+  background: rgba(250, 204, 21, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(250, 204, 21, 0.25);
+}
+.spark-today .spark-bar-tok { background: linear-gradient(180deg, #facc15, #eab308); }
+.spark-today .spark-bar-msg { background: linear-gradient(180deg, #fdba74, #f97316); }
+
+.spark-label {
+  font-size: 9px;
   color: #71717a;
   font-variant-numeric: tabular-nums;
 }
+.spark-today .spark-label { color: #facc15; font-weight: 600; }
 
 /* ── Divider ──────────────────────────────────── */
 .divider {

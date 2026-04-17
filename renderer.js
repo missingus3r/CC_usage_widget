@@ -164,20 +164,63 @@ function buildSections() {
   }
 
   if (localUsage) {
-    const row = (label, t) => {
-      const total = t.input + t.output + t.cacheRead + t.cacheCreate;
+    const tokenTotal = (t) => t.input + t.output + t.cacheRead + t.cacheCreate;
+
+    const stackedBar = (t) => {
+      const total = tokenTotal(t);
+      if (total === 0) return `<div class="local-stacked-bar empty"></div>`;
+      const inPct    = (t.input  / total) * 100;
+      const outPct   = (t.output / total) * 100;
+      const cachePct = ((t.cacheRead + t.cacheCreate) / total) * 100;
       return `
-        <div class="local-row">
-          <div class="local-row-head">
-            <span class="local-row-label">${label}</span>
-            <span class="local-row-total">${fmtNum(total)}</span>
-          </div>
-          <div class="local-row-breakdown">
-            <span>in ${fmtNum(t.input)}</span>
-            <span>out ${fmtNum(t.output)}</span>
-            <span>cache ${fmtNum(t.cacheRead + t.cacheCreate)}</span>
-            <span>${t.messages} msgs</span>
-          </div>
+        <div class="local-stacked-bar">
+          <div class="seg seg-in"    style="width:${inPct}%"    title="Input ${fmtNum(t.input)}"></div>
+          <div class="seg seg-out"   style="width:${outPct}%"   title="Output ${fmtNum(t.output)}"></div>
+          <div class="seg seg-cache" style="width:${cachePct}%" title="Cache ${fmtNum(t.cacheRead + t.cacheCreate)}"></div>
+        </div>`;
+    };
+
+    const legend = (t) => `
+      <div class="local-legend">
+        <span class="leg"><i class="dot dot-in"></i>In <b>${fmtNum(t.input)}</b></span>
+        <span class="leg"><i class="dot dot-out"></i>Out <b>${fmtNum(t.output)}</b></span>
+        <span class="leg"><i class="dot dot-cache"></i>Cache <b>${fmtNum(t.cacheRead + t.cacheCreate)}</b></span>
+        <span class="leg leg-msgs">${t.messages} msgs</span>
+      </div>`;
+
+    const row = (label, t) => `
+      <div class="local-row">
+        <div class="local-row-head">
+          <span class="local-row-label">${label}</span>
+          <span class="local-row-total">${fmtNum(tokenTotal(t))}</span>
+        </div>
+        ${stackedBar(t)}
+        ${legend(t)}
+      </div>`;
+
+    const sparkline = () => {
+      const totals = localUsage.daily.map(d => tokenTotal(d.totals));
+      const maxT   = Math.max(1, ...totals);
+      const maxM   = Math.max(1, ...localUsage.daily.map(d => d.totals.messages));
+      const lastIdx = localUsage.daily.length - 1;
+      return `
+        <div class="local-spark-title">Last 7 days · tokens · messages</div>
+        <div class="local-sparkline">
+          ${localUsage.daily.map((d, i) => {
+            const t   = totals[i];
+            const msg = d.totals.messages;
+            const hT  = t   > 0 ? Math.max(3, (t   / maxT) * 100) : 0;
+            const hM  = msg > 0 ? Math.max(3, (msg / maxM) * 100) : 0;
+            const isToday = i === lastIdx;
+            return `
+              <div class="spark-col${isToday ? ' spark-today' : ''}" title="${d.label} ${d.date}&#10;${fmtNum(t)} tokens · ${msg} msgs">
+                <div class="spark-track">
+                  <div class="spark-bar spark-bar-tok" style="height:${hT}%"></div>
+                  <div class="spark-bar spark-bar-msg" style="height:${hM}%"></div>
+                </div>
+                <span class="spark-label">${d.label[0]}</span>
+              </div>`;
+          }).join('')}
         </div>`;
     };
 
@@ -189,6 +232,7 @@ function buildSections() {
         </div>
         ${row('Today', localUsage.today)}
         ${row('7 days', localUsage.week)}
+        ${sparkline()}
       </div>`;
   }
 
