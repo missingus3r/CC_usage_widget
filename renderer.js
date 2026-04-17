@@ -3,6 +3,10 @@ let usageData = null;
 let lastFetch = null;
 const REFRESH_MS = 30 * 60 * 1000;
 let tickInterval = null;
+let fetching = false;
+// Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
+// so a countdown that sits at "Now!" for a while doesn't re-trigger every tick.
+const firedResets = new Set();
 
 // ── DOM refs ───────────────────────────────────────────────────
 const content = document.getElementById('content');
@@ -157,40 +161,41 @@ function buildSections() {
 // ── Tick: update countdowns every second ───────────────────────
 function tick() {
   const now = new Date();
+  let forceRefresh = false;
 
-  if (usageData?.session) {
-    const el = document.getElementById('cd-session');
-    if (el) {
-      const target = parseResetDate(usageData.session.resets);
-      el.textContent = fmtCountdown(target - now);
+  const updateSection = (section, elId) => {
+    const d = usageData?.[section];
+    if (!d || !d.resets) return;
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const remaining = parseResetDate(d.resets) - now;
+    el.textContent = fmtCountdown(remaining);
+    if (remaining <= 0) {
+      const key = `${section}:${d.resets}`;
+      if (!firedResets.has(key)) {
+        firedResets.add(key);
+        forceRefresh = true;
+      }
     }
-  }
+  };
 
-  if (usageData?.weekAll) {
-    const el = document.getElementById('cd-week');
-    if (el) {
-      const target = parseResetDate(usageData.weekAll.resets);
-      el.textContent = fmtCountdown(target - now);
-    }
-  }
-
-  if (usageData?.extra) {
-    const el = document.getElementById('cd-extra');
-    if (el) {
-      const target = parseResetDate(usageData.extra.resets);
-      el.textContent = fmtCountdown(target - now);
-    }
-  }
+  updateSection('session', 'cd-session');
+  updateSection('weekAll', 'cd-week');
+  updateSection('extra', 'cd-extra');
 
   // Footer: next refresh
   if (lastFetch) {
     const nextRefresh = new Date(lastFetch.getTime() + REFRESH_MS);
     footerNext.textContent = `↻ ${fmtCountdown(nextRefresh - now)}`;
   }
+
+  if (forceRefresh && !fetching) doFetch();
 }
 
 // ── Fetch usage ────────────────────────────────────────────────
 async function doFetch() {
+  if (fetching) return;
+  fetching = true;
   btnRefresh.classList.add('spinning');
 
   if (!usageData) {
@@ -200,6 +205,7 @@ async function doFetch() {
   const data = await window.api.fetchUsage();
 
   btnRefresh.classList.remove('spinning');
+  fetching = false;
 
   if (data) {
     usageData = data;

@@ -42,6 +42,9 @@ let usageData = null;   // parsed data from last fetch
 let lastFetch = null;   // Date of last successful fetch
 let fetching = false;
 const REFRESH_MS = 30 * 60 * 1000; // 30 minutes
+// Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
+// so a countdown that sits at "Now!" doesn't re-trigger every tick.
+const firedResets = new Set();
 
 // ── ANSI helpers ───────────────────────────────────────────────
 const CLR  = '\x1b[2J\x1b[H';      // clear screen + cursor home
@@ -229,6 +232,15 @@ function render() {
   const now = new Date();
   const sep = `${DIM}${'─'.repeat(54)}${RST}`;
   let lines = [];
+  let forceRefresh = false;
+
+  const checkExpired = (section, resetsStr) => {
+    const key = `${section}:${resetsStr}`;
+    if (!firedResets.has(key)) {
+      firedResets.add(key);
+      forceRefresh = true;
+    }
+  };
 
   lines.push('');
   lines.push(`${BOLD}${CYAN}  ☁  Claude Code Usage Dashboard${RST}`);
@@ -243,6 +255,7 @@ function render() {
       const d = usageData.session;
       const target = parseResetDate(d.resets);
       const remaining = target - now;
+      if (remaining <= 0) checkExpired('session', d.resets);
       const cd = formatCountdown(remaining);
       lines.push(`${BOLD}  Current Session${RST}`);
       lines.push(`  ${makeBar(d.pct)}`);
@@ -255,6 +268,7 @@ function render() {
       const d = usageData.weekAll;
       const target = parseResetDate(d.resets);
       const remaining = target - now;
+      if (remaining <= 0) checkExpired('weekAll', d.resets);
       const cd = formatCountdown(remaining);
       lines.push(`${BOLD}  Weekly (All Models)${RST}`);
       lines.push(`  ${makeBar(d.pct)}`);
@@ -275,6 +289,7 @@ function render() {
       const d = usageData.extra;
       const target = parseResetDate(d.resets);
       const remaining = target - now;
+      if (remaining <= 0) checkExpired('extra', d.resets);
       const cd = formatCountdown(remaining);
       lines.push(`${BOLD}  Extra Usage${RST}`);
       lines.push(`  ${makeBar(d.pct)}`);
@@ -300,6 +315,8 @@ function render() {
   lines.push('');
 
   process.stdout.write(CLR + lines.join('\n'));
+
+  if (forceRefresh && !fetching) refresh();
 }
 
 // ── Main loop ──────────────────────────────────────────────────
