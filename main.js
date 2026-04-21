@@ -8,6 +8,7 @@ const { readLocalUsage } = require('./localUsage');
 let win = null;
 let tray = null;
 let latestUsage = null;
+let latestCodex = null;
 let isQuitting = false;
 
 // ── PNG encoder (no deps) ──────────────────────────────────────
@@ -88,10 +89,10 @@ function buildTrayIcon(sessionPct, weekPct) {
   return encodePng(size, size, raw);
 }
 
-// ── Fetch usage by running fetcher.js with system Node ─────────
-function fetchUsage() {
+// ── Fetch usage by running a fetcher script with system Node ───
+function runFetcher(scriptName) {
   return new Promise((resolve) => {
-    const fetcherPath = path.join(__dirname, 'fetcher.js');
+    const fetcherPath = path.join(__dirname, scriptName);
     const child = spawn('node', [fetcherPath], {
       stdio: ['ignore', 'pipe', 'ignore'],
       env: { ...process.env },
@@ -117,6 +118,9 @@ function fetchUsage() {
   });
 }
 
+const fetchUsage = () => runFetcher('fetcher.js');
+const fetchCodexUsage = () => runFetcher('codexFetcher.js');
+
 // ── Tray ───────────────────────────────────────────────────────
 function updateTray() {
   if (!tray) return;
@@ -128,18 +132,34 @@ function updateTray() {
 
   tray.setImage(nativeImage.createFromBuffer(buildTrayIcon(s ?? null, w ?? null)));
 
-  const tipLines = ['Claude Code Usage'];
+  const cx5Left = latestCodex?.session5h?.pctLeft;
+  const cxwLeft = latestCodex?.weekly?.pctLeft;
+
+  const tipLines = ['AI Usage'];
+  tipLines.push('— Claude —');
   tipLines.push(s != null ? `Session: ${s}%` : 'Session: —');
   tipLines.push(w != null ? `Week (all): ${w}%` : 'Week (all): —');
   if (ws != null) tipLines.push(`Week (Sonnet): ${ws}%`);
   if (e) tipLines.push(`Extra: ${e.pct}% ($${e.spent} / $${e.total})`);
+  if (cx5Left != null || cxwLeft != null) {
+    tipLines.push('— Codex —');
+    if (cx5Left != null) tipLines.push(`5h limit: ${cx5Left}%`);
+    if (cxwLeft != null) tipLines.push(`Weekly: ${cxwLeft}%`);
+  }
   tray.setToolTip(tipLines.join('\n'));
 
   const menu = Menu.buildFromTemplate([
-    { label: s != null ? `Session  ${s}%` : 'Session  —', enabled: false },
-    { label: w != null ? `Week (all)  ${w}%` : 'Week (all)  —', enabled: false },
-    ...(ws != null ? [{ label: `Week (Sonnet)  ${ws}%`, enabled: false }] : []),
-    ...(e ? [{ label: `Extra  ${e.pct}%  ($${e.spent}/$${e.total})`, enabled: false }] : []),
+    { label: 'Claude', enabled: false },
+    { label: s != null ? `  Session  ${s}%` : '  Session  —', enabled: false },
+    { label: w != null ? `  Week (all)  ${w}%` : '  Week (all)  —', enabled: false },
+    ...(ws != null ? [{ label: `  Week (Sonnet)  ${ws}%`, enabled: false }] : []),
+    ...(e ? [{ label: `  Extra  ${e.pct}%  ($${e.spent}/$${e.total})`, enabled: false }] : []),
+    ...(cx5Left != null || cxwLeft != null ? [
+      { type: 'separator' },
+      { label: 'Codex', enabled: false },
+      ...(cx5Left != null ? [{ label: `  5h limit  ${cx5Left}%`, enabled: false }] : []),
+      ...(cxwLeft != null ? [{ label: `  Weekly  ${cxwLeft}%`, enabled: false }] : []),
+    ] : []),
     { type: 'separator' },
     { label: 'Show widget', click: () => showWindow() },
     { label: 'Refresh now', click: () => { if (win) win.webContents.send('trigger-refresh'); } },
@@ -151,7 +171,7 @@ function updateTray() {
 
 function createTray() {
   tray = new Tray(nativeImage.createFromBuffer(buildTrayIcon(null, null)));
-  tray.setToolTip('Claude Code Usage — loading…');
+  tray.setToolTip('AI Usage — loading…');
   tray.on('click', () => {
     if (!win) { createWindow(); return; }
     if (win.isVisible()) win.hide(); else showWindow();
@@ -171,7 +191,7 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 340,
-    height: 720,
+    height: 860,
     x: screenW - 360,
     y: 20,
     frame: false,
@@ -199,12 +219,17 @@ function createWindow() {
 
 // ── IPC ────────────────────────────────────────────────────────
 ipcMain.handle('fetch-usage', () => fetchUsage());
+ipcMain.handle('fetch-codex-usage', () => fetchCodexUsage());
 ipcMain.handle('fetch-local-usage', () => readLocalUsage());
 ipcMain.handle('get-config', () => loadConfig());
 ipcMain.on('window-minimize', () => { if (win) win.hide(); });
 ipcMain.on('window-close', () => { if (win) win.hide(); });
 ipcMain.on('usage-updated', (_event, data) => {
   latestUsage = data;
+  updateTray();
+});
+ipcMain.on('codex-usage-updated', (_event, data) => {
+  latestCodex = data;
   updateTray();
 });
 

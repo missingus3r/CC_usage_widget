@@ -32,14 +32,36 @@ function findClaude() {
   } catch { return null; }
 }
 
+function findCodex() {
+  const home = os.homedir();
+  const candidates = process.platform === 'win32'
+    ? [
+        path.join(home, 'AppData', 'Roaming', 'npm', 'codex.cmd'),
+        path.join(home, 'AppData', 'Roaming', 'npm', 'codex.exe'),
+        path.join(home, '.local', 'bin', 'codex.exe'),
+      ]
+    : [
+        path.join(home, '.local', 'bin', 'codex'),
+        '/usr/local/bin/codex',
+        '/usr/bin/codex',
+      ];
+  for (const p of candidates) if (fs.existsSync(p)) return p;
+  try {
+    const cmd = process.platform === 'win32' ? 'where codex' : 'which codex';
+    return execSync(cmd, { encoding: 'utf-8' }).trim().split('\n')[0].trim();
+  } catch { return null; }
+}
+
 const CLAUDE_PATH = findClaude();
 if (!CLAUDE_PATH) {
   console.error('claude binary not found. Install Claude Code and run `claude` once to log in.');
   process.exit(1);
 }
+const CODEX_PATH = findCodex(); // optional — panel is skipped if missing
 
 // ── State ──────────────────────────────────────────────────────
-let usageData = null;   // parsed data from last fetch
+let usageData = null;   // parsed data from last fetch (Claude)
+let codexData = null;   // parsed data from last fetch (Codex)
 let lastFetch = null;   // Date of last successful fetch
 let fetching = false;
 const REFRESH_MS = loadConfig().refreshMinutes * 60 * 1000;
@@ -80,6 +102,7 @@ function makeBar(pct, width = 30) {
   else if (pct >= 50) color = YEL;
   return `${color}${'█'.repeat(filled)}${DIM}${'░'.repeat(empty)}${RST} ${pct}%`;
 }
+
 
 // ── Countdown helpers ──────────────────────────────────────────
 function parseResetDate(resetStr) {
@@ -127,6 +150,32 @@ function parseResetDate(resetStr) {
   const diffMin = artOffsetMin - localOffsetMin;
   target = new Date(target.getTime() + diffMin * 60 * 1000);
 
+  return target;
+}
+
+// Codex /status prints resets in local time, no timezone suffix.
+function parseCodexResetDate(resetStr) {
+  const now = new Date();
+  const timeMatch = resetStr.match(/(\d{1,2}):(\d{2})/);
+  let hour = 0, minute = 0;
+  if (timeMatch) {
+    hour = parseInt(timeMatch[1]);
+    minute = parseInt(timeMatch[2]);
+  }
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+  const dateMatch = resetStr.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i);
+  let target;
+  if (dateMatch) {
+    const day = parseInt(dateMatch[1]);
+    const month = months[dateMatch[2].toLowerCase()];
+    target = new Date(now.getFullYear(), month, day, hour, minute, 0);
+    if (target < now && (now - target) > 180 * 24 * 3600 * 1000) {
+      target.setFullYear(target.getFullYear() + 1);
+    }
+  } else {
+    target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+    if (target <= now) target.setDate(target.getDate() + 1);
+  }
   return target;
 }
 
@@ -184,6 +233,32 @@ function parseUsage(raw) {
   return (data.session || data.weekAll || data.extra) ? data : null;
 }
 
+// Parse codex /status box.
+function parseCodexStatus(raw) {
+  const clean = stripAnsi(raw).replace(/\s+/g, ' ');
+  const data = {};
+
+  const h5 = clean.match(/5h\s*limit\s*:?\s*\[[█░▌▏\s]*\]\s*(\d+)\s*%\s*left\s*\(\s*resets?\s+([^)]+?)\)/i);
+  if (h5) {
+    const pctLeft = parseInt(h5[1]);
+    data.session5h = { pct: Math.max(0, Math.min(100, 100 - pctLeft)), pctLeft, resets: h5[2].replace(/\s+/g, ' ').trim() };
+  }
+
+  const wk = clean.match(/Weekly\s*limit\s*:?\s*\[[█░▌▏\s]*\]\s*(\d+)\s*%\s*left\s*\(\s*resets?\s+([^)]+?)\)/i);
+  if (wk) {
+    const pctLeft = parseInt(wk[1]);
+    data.weekly = { pct: Math.max(0, Math.min(100, 100 - pctLeft)), pctLeft, resets: wk[2].replace(/\s+/g, ' ').trim() };
+  }
+
+  const acc = clean.match(/Account\s*:?\s*(\S+?@\S+?)\s*\(([^)]+)\)/i);
+  if (acc) data.account = { email: acc[1].trim(), plan: acc[2].trim() };
+
+  const mdl = clean.match(/Model\s*:?\s*([^\s│()]+)\s+\(([^)]+)\)/i);
+  if (mdl) data.model = { name: mdl[1].trim(), detail: mdl[2].trim() };
+
+  return (data.session5h || data.weekly) ? data : null;
+}
+
 // ── Fetch usage via PTY ────────────────────────────────────────
 function fetchUsage() {
   return new Promise((resolve) => {
@@ -228,6 +303,39 @@ function fetchUsage() {
   });
 }
 
+// Fetch codex /status — resolves to parsed data or null.
+function fetchCodexUsage() {
+  return new Promise((resolve) => {
+    if (!CODEX_PATH) return resolve(null);
+
+    let output = '';
+    const proc = pty.spawn(CODEX_PATH, [], {
+      name: 'xterm-256color',
+      cols: 140,
+      rows: 60,
+      cwd: path.join(os.homedir(), 'Desktop'),
+      env: { ...process.env, TERM: 'xterm-256color' }
+    });
+
+    proc.onData((data) => { output += data; });
+
+    setTimeout(() => proc.write('/status'), 8000);
+    setTimeout(() => proc.write('\r'),       9000);
+    setTimeout(() => proc.write('\n'),       9500);
+
+    setTimeout(() => {
+      const data = parseCodexStatus(output);
+      try { proc.kill(); } catch (e) {}
+      resolve(data);
+    }, 20000);
+
+    setTimeout(() => {
+      try { proc.kill(); } catch (e) {}
+      resolve(parseCodexStatus(output));
+    }, 35000);
+  });
+}
+
 // ── Render dashboard ───────────────────────────────────────────
 function render() {
   const now = new Date();
@@ -244,72 +352,104 @@ function render() {
   };
 
   lines.push('');
-  lines.push(`${BOLD}${CYAN}  ☁  Claude Code Usage Dashboard${RST}`);
+  lines.push(`${BOLD}${CYAN}  ☁  AI Usage Dashboard${RST}`);
   lines.push(sep);
 
-  if (!usageData) {
+  if (!usageData && !codexData) {
     lines.push(`  ${DIM}Fetching usage data...${RST}`);
     lines.push(sep);
   } else {
-    // ── Current Session ──
-    if (usageData.session) {
-      const d = usageData.session;
-      const target = parseResetDate(d.resets);
-      const remaining = target - now;
-      if (remaining <= 0) checkExpired('session', d.resets);
-      const cd = formatCountdown(remaining);
-      lines.push(`${BOLD}  Current Session${RST}`);
-      lines.push(`  ${makeBar(d.pct)}`);
-      lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
+    if (usageData) {
+      lines.push(`${BOLD}${CYAN}  Claude${RST}`);
       lines.push('');
+
+      if (usageData.session) {
+        const d = usageData.session;
+        const target = parseResetDate(d.resets);
+        const remaining = target - now;
+        if (remaining <= 0) checkExpired('session', d.resets);
+        const cd = formatCountdown(remaining);
+        lines.push(`${BOLD}  Current Session${RST}`);
+        lines.push(`  ${makeBar(d.pct)}`);
+        lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
+        lines.push('');
+      }
+
+      if (usageData.weekAll) {
+        const d = usageData.weekAll;
+        const target = parseResetDate(d.resets);
+        const remaining = target - now;
+        if (remaining <= 0) checkExpired('weekAll', d.resets);
+        const cd = formatCountdown(remaining);
+        lines.push(`${BOLD}  Weekly (All Models)${RST}`);
+        lines.push(`  ${makeBar(d.pct)}`);
+        lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
+        lines.push('');
+      }
+
+      if (usageData.weekSonnet) {
+        const d = usageData.weekSonnet;
+        lines.push(`${BOLD}  Weekly (Sonnet Only)${RST}`);
+        lines.push(`  ${makeBar(d.pct)}`);
+        lines.push('');
+      }
+
+      if (usageData.extra) {
+        const d = usageData.extra;
+        const target = parseResetDate(d.resets);
+        const remaining = target - now;
+        if (remaining <= 0) checkExpired('extra', d.resets);
+        const cd = formatCountdown(remaining);
+        lines.push(`${BOLD}  Extra Usage${RST}`);
+        lines.push(`  ${makeBar(d.pct)}`);
+        lines.push(`  ${DIM}$${d.spent} / $${d.total} spent · Resets in:${RST} ${BOLD}${cd}${RST}`);
+        lines.push('');
+      }
+
+      if (usageData.insight) {
+        lines.push(`  ${YEL}⚡ ${usageData.insight}${RST}`);
+        lines.push('');
+      }
     }
 
-    // ── Weekly (All Models) ──
-    if (usageData.weekAll) {
-      const d = usageData.weekAll;
-      const target = parseResetDate(d.resets);
-      const remaining = target - now;
-      if (remaining <= 0) checkExpired('weekAll', d.resets);
-      const cd = formatCountdown(remaining);
-      lines.push(`${BOLD}  Weekly (All Models)${RST}`);
-      lines.push(`  ${makeBar(d.pct)}`);
-      lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
-      lines.push('');
-    }
-
-    // ── Weekly (Sonnet Only) ──
-    if (usageData.weekSonnet) {
-      const d = usageData.weekSonnet;
-      lines.push(`${BOLD}  Weekly (Sonnet Only)${RST}`);
-      lines.push(`  ${makeBar(d.pct)}`);
-      lines.push('');
-    }
-
-    // ── Extra Usage ──
-    if (usageData.extra) {
-      const d = usageData.extra;
-      const target = parseResetDate(d.resets);
-      const remaining = target - now;
-      if (remaining <= 0) checkExpired('extra', d.resets);
-      const cd = formatCountdown(remaining);
-      lines.push(`${BOLD}  Extra Usage${RST}`);
-      lines.push(`  ${makeBar(d.pct)}`);
-      lines.push(`  ${DIM}$${d.spent} / $${d.total} spent · Resets in:${RST} ${BOLD}${cd}${RST}`);
-      lines.push('');
-    }
-
-    // ── Insight ──
-    if (usageData.insight) {
+    if (codexData) {
       lines.push(sep);
-      lines.push(`  ${YEL}⚡ ${usageData.insight}${RST}`);
+      const plan = codexData.account ? ` ${DIM}· ${codexData.account.plan}${RST}` : '';
+      lines.push(`${BOLD}${CYAN}  Codex${RST}${plan}`);
+      lines.push('');
+
+      if (codexData.session5h) {
+        const d = codexData.session5h;
+        const target = parseCodexResetDate(d.resets);
+        const remaining = target - now;
+        if (remaining <= 0) checkExpired('codex-5h', d.resets);
+        const cd = formatCountdown(remaining);
+        lines.push(`${BOLD}  5h Limit${RST}`);
+        lines.push(`  ${makeBar(d.pctLeft)}`);
+        lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
+        lines.push('');
+      }
+
+      if (codexData.weekly) {
+        const d = codexData.weekly;
+        const target = parseCodexResetDate(d.resets);
+        const remaining = target - now;
+        if (remaining <= 0) checkExpired('codex-week', d.resets);
+        const cd = formatCountdown(remaining);
+        lines.push(`${BOLD}  Weekly Limit${RST}`);
+        lines.push(`  ${makeBar(d.pctLeft)}`);
+        lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
+        lines.push('');
+      }
     }
 
     lines.push(sep);
 
-    // ── Footer ──
-    const nextRefresh = new Date(lastFetch.getTime() + REFRESH_MS);
-    const refreshIn = formatCountdown(nextRefresh - now);
-    lines.push(`  ${DIM}Last updated: ${lastFetch.toLocaleTimeString()} · Next refresh in ${refreshIn}${RST}`);
+    if (lastFetch) {
+      const nextRefresh = new Date(lastFetch.getTime() + REFRESH_MS);
+      const refreshIn = formatCountdown(nextRefresh - now);
+      lines.push(`  ${DIM}Last updated: ${lastFetch.toLocaleTimeString()} · Next refresh in ${refreshIn}${RST}`);
+    }
   }
 
   lines.push(`  ${DIM}Ctrl+C to exit${RST}`);
@@ -322,11 +462,13 @@ function render() {
 
 // ── Main loop ──────────────────────────────────────────────────
 async function refresh() {
-  const data = await fetchUsage();
-  if (data) {
-    usageData = data;
-    lastFetch = new Date();
-  }
+  const [data, codex] = await Promise.all([
+    fetchUsage(),
+    fetchCodexUsage(),
+  ]);
+  if (data) usageData = data;
+  if (codex) codexData = codex;
+  if (data || codex) lastFetch = new Date();
 }
 
 async function main() {

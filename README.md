@@ -1,11 +1,11 @@
-# Claude Code Usage Widget
+# AI Usage Widget
 
-Two small tools that show your **Claude Code** usage in real time — current session %, weekly limits (all models + Sonnet only), and Extra Usage spend — with live countdowns to each reset.
+Two small tools that show your **Claude Code** and **OpenAI Codex** usage in real time — Claude's session %, weekly limits (all models + Sonnet only) and Extra Usage spend, plus Codex's 5-hour and weekly limits — with live countdowns to each reset.
 
 - A **terminal dashboard** (`get_usage.js`) that renders directly in your shell.
-- A **floating desktop widget** (Electron) that stays on top of your windows. Includes a **system tray icon** with two live bars (session % on top, weekly % on bottom) and a tooltip/menu showing the exact numbers.
+- A **floating desktop widget** (Electron) that stays on top of your windows. Includes a **system tray icon** with two live bars (Claude session % on top, weekly % on bottom) and a tooltip/menu showing the exact numbers for both providers.
 
-No API keys, no tokens, no config files. It reuses the `claude` CLI session you already have logged in.
+No API keys, no tokens, no config files. It reuses the `claude` and `codex` CLI sessions you already have logged in. Codex is optional — if `codex` is not installed, that panel is simply skipped.
 
 ---
 
@@ -23,11 +23,11 @@ No API keys, no tokens, no config files. It reuses the `claude` CLI session you 
 
 ## How it works (the simple version)
 
-1. You already log in to Claude Code once with `claude` in a terminal.
-2. These tools spawn `claude` in a pseudo-terminal (via `node-pty`), type `/usage`, capture the rendered screen, and parse out the numbers.
+1. You already log in to Claude Code once with `claude`, and/or to Codex once with `codex`, in a terminal.
+2. These tools spawn each CLI in a pseudo-terminal (via `node-pty`), type `/usage` (Claude) or `/status` (Codex), capture the rendered screen, and parse out the numbers.
 3. Data is refreshed every N minutes (default 15, configurable — see below). Countdowns tick every second locally and force an immediate refresh the moment any of them reaches zero.
 
-That's it — no scraping of the API, no tokens handled by the app. If you can run `claude` in your terminal, these tools work.
+That's it — no scraping of APIs, no tokens handled by the app. If you can run `claude` and/or `codex` in your terminal, these tools work.
 
 ### Configuration
 
@@ -87,15 +87,16 @@ An always-on-top frameless window appears in the top-right corner of your primar
 
 ## Project layout
 
-| File              | Purpose                                                     |
-| ----------------- | ----------------------------------------------------------- |
-| `get_usage.js`    | Standalone terminal dashboard.                              |
-| `fetcher.js`      | One-shot fetcher — runs `claude /usage` and prints JSON.    |
-| `main.js`         | Electron main process; spawns `fetcher.js` on a timer.      |
-| `preload.js`      | Electron preload bridging IPC to the renderer.              |
-| `renderer.js`     | Widget UI logic.                                            |
-| `index.html`      | Widget markup.                                              |
-| `styles.css`      | Widget styles.                                              |
+| File                | Purpose                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| `get_usage.js`      | Standalone terminal dashboard.                              |
+| `fetcher.js`        | One-shot fetcher — runs `claude /usage` and prints JSON.    |
+| `codexFetcher.js`   | One-shot fetcher — runs `codex /status` and prints JSON.    |
+| `main.js`           | Electron main process; spawns both fetchers on a timer.     |
+| `preload.js`        | Electron preload bridging IPC to the renderer.              |
+| `renderer.js`       | Widget UI logic.                                            |
+| `index.html`        | Widget markup.                                              |
+| `styles.css`        | Widget styles.                                              |
 
 ---
 

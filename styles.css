@@ -88,6 +88,19 @@ body {
   overflow-y: auto;
 }
 
+/* ── Provider header ──────────────────────────── */
+.provider-header {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #e4e4e7;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 8px 0 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.provider-header:first-child { margin-top: 2px; }
+
 /* ── Section ──────────────────────────────────── */
 .section {
   margin-bottom: 14px;
