@@ -13,15 +13,15 @@ No API keys, no tokens, no config files. It reuses the `claude` and `codex` CLI 
 
 **Terminal dashboard (`node get_usage.js`)**
 
-![Terminal dashboard](script.png)
+![Terminal dashboard](screenshots/script.png)
 
 **Floating desktop widget (`npm start`)**
 
-![Desktop widget](widget.png)
+![Desktop widget](screenshots/widget.png)
 
 **System tray icon with live bars and tooltip**
 
-![Tray icon](tray.png)
+![Tray icon](screenshots/tray.png)
 
 The tray icon sits next to the clock and draws two horizontal bars — Claude's session % on top and weekly % on bottom — so you can see your usage at a glance without opening the widget. Hovering (or right-clicking) shows the full breakdown for both Claude and Codex: session, weekly (all models), weekly (Sonnet), Codex 5-hour limit and Codex weekly.
 
