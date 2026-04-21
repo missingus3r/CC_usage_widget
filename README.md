@@ -19,6 +19,12 @@ No API keys, no tokens, no config files. It reuses the `claude` and `codex` CLI 
 
 ![Desktop widget](widget.png)
 
+**System tray icon with live bars and tooltip**
+
+![Tray icon](tray.png)
+
+The tray icon sits next to the clock and draws two horizontal bars — Claude's session % on top and weekly % on bottom — so you can see your usage at a glance without opening the widget. Hovering (or right-clicking) shows the full breakdown for both Claude and Codex: session, weekly (all models), weekly (Sonnet), Codex 5-hour limit and Codex weekly.
+
 ---
 
 ## How it works (the simple version)
