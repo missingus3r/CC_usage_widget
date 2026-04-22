@@ -425,7 +425,7 @@ function render() {
         if (remaining <= 0) checkExpired('codex-5h', d.resets);
         const cd = formatCountdown(remaining);
         lines.push(`${BOLD}  5h Limit${RST}`);
-        lines.push(`  ${makeBar(d.pctLeft)}`);
+        lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
         lines.push('');
       }
@@ -437,7 +437,7 @@ function render() {
         if (remaining <= 0) checkExpired('codex-week', d.resets);
         const cd = formatCountdown(remaining);
         lines.push(`${BOLD}  Weekly Limit${RST}`);
-        lines.push(`  ${makeBar(d.pctLeft)}`);
+        lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
         lines.push('');
       }

@@ -154,17 +154,22 @@ function updateTray() {
     { label: w != null ? `  Week (all)  ${w}%` : '  Week (all)  —', enabled: false },
     ...(ws != null ? [{ label: `  Week (Sonnet)  ${ws}%`, enabled: false }] : []),
     ...(e ? [{ label: `  Extra  ${e.pct}%  ($${e.spent}/$${e.total})`, enabled: false }] : []),
-    ...(cx5Left != null || cxwLeft != null ? [
+    ...(cx5 != null || cxw != null ? [
       { type: 'separator' },
       { label: 'Codex', enabled: false },
-      ...(cx5Left != null ? [{ label: `  5h limit  ${cx5Left}%`, enabled: false }] : []),
-      ...(cxwLeft != null ? [{ label: `  Weekly  ${cxwLeft}%`, enabled: false }] : []),
+      ...(cx5 != null ? [{ label: `  5h limit  ${cx5}%`, enabled: false }] : []),
+      ...(cxw != null ? [{ label: `  Weekly  ${cxw}%`, enabled: false }] : []),
     ] : []),
     { type: 'separator' },
     { label: 'Show widget', click: () => showWindow() },
     { label: 'Refresh now', click: () => { if (win) win.webContents.send('trigger-refresh'); } },
     { type: 'separator' },
-    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
+    { label: 'Quit', click: () => {
+        isQuitting = true;
+        try { if (tray) tray.destroy(); } catch {}
+        try { if (win) win.destroy(); } catch {}
+        app.exit(0);
+      } },
   ]);
   tray.setContextMenu(menu);
 }
