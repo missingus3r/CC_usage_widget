@@ -208,7 +208,7 @@ function buildSections() {
     html += `<div class="provider-header">Codex${acct}</div>`;
 
     if (codexData.session5h) {
-      const p = codexData.session5h.pctLeft;
+      const p = codexData.session5h.pct;
       html += `
         <div class="section">
           <div class="section-header">
@@ -223,7 +223,7 @@ function buildSections() {
     }
 
     if (codexData.weekly) {
-      const p = codexData.weekly.pctLeft;
+      const p = codexData.weekly.pct;
       html += `
         <div class="section">
           <div class="section-header">

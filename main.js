@@ -132,8 +132,8 @@ function updateTray() {
 
   tray.setImage(nativeImage.createFromBuffer(buildTrayIcon(s ?? null, w ?? null)));
 
-  const cx5Left = latestCodex?.session5h?.pctLeft;
-  const cxwLeft = latestCodex?.weekly?.pctLeft;
+  const cx5 = latestCodex?.session5h?.pct;
+  const cxw = latestCodex?.weekly?.pct;
 
   const tipLines = ['AI Usage'];
   tipLines.push('— Claude —');
@@ -141,10 +141,10 @@ function updateTray() {
   tipLines.push(w != null ? `Week (all): ${w}%` : 'Week (all): —');
   if (ws != null) tipLines.push(`Week (Sonnet): ${ws}%`);
   if (e) tipLines.push(`Extra: ${e.pct}% ($${e.spent} / $${e.total})`);
-  if (cx5Left != null || cxwLeft != null) {
+  if (cx5 != null || cxw != null) {
     tipLines.push('— Codex —');
-    if (cx5Left != null) tipLines.push(`5h limit: ${cx5Left}%`);
-    if (cxwLeft != null) tipLines.push(`Weekly: ${cxwLeft}%`);
+    if (cx5 != null) tipLines.push(`5h limit: ${cx5}%`);
+    if (cxw != null) tipLines.push(`Weekly: ${cxw}%`);
   }
   tray.setToolTip(tipLines.join('\n'));
 
