@@ -76,10 +76,7 @@ const ELEVEN_KEY = (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API
 const firedResets = new Set();
 
 // ── ANSI helpers ───────────────────────────────────────────────
-// [3J clears scrollback, [2J clears the viewport, [H moves cursor home.
-// Without [3J, content taller than the terminal leaves old frames
-// stuck above the viewport.
-const CLR  = '\x1b[3J\x1b[2J\x1b[H';
+const CLR  = '\x1b[2J\x1b[H';      // clear screen + cursor home
 const BOLD = '\x1b[1m';
 const DIM  = '\x1b[90m';
 const CYAN = '\x1b[36m';
@@ -89,10 +86,6 @@ const RED  = '\x1b[31m';
 const RST  = '\x1b[0m';
 const HIDE = '\x1b[?25l';
 const SHOW = '\x1b[?25h';
-// Alternate screen buffer (vim/less style) — keeps the dashboard
-// from accumulating frames in the terminal scrollback.
-const ALT_ON  = '\x1b[?1049h';
-const ALT_OFF = '\x1b[?1049l';
 
 function stripAnsi(str) {
   return str
@@ -550,15 +543,14 @@ async function refresh() {
 }
 
 async function main() {
-  process.stdout.write(ALT_ON + HIDE);
-  const cleanup = () => {
-    process.stdout.write(SHOW + ALT_OFF);
-  };
+  process.stdout.write(HIDE);
   process.on('SIGINT', () => {
-    cleanup();
+    process.stdout.write(SHOW + '\n');
     process.exit(0);
   });
-  process.on('exit', cleanup);
+  process.on('exit', () => {
+    process.stdout.write(SHOW);
+  });
 
   // Initial render while fetching
   render();
