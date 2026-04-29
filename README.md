@@ -1,11 +1,12 @@
 # AI Usage Widget
 
-Two small tools that show your **Claude Code** and **OpenAI Codex** usage in real time — Claude's session %, weekly limits (all models + Sonnet only) and Extra Usage spend, plus Codex's 5-hour and weekly limits — with live countdowns to each reset.
+Tools that show your **Claude Code**, **OpenAI Codex** and **ElevenLabs** usage in real time — Claude's session %, weekly limits (all models + Sonnet only) and Extra Usage spend, Codex's 5-hour and weekly limits, and ElevenLabs' character + voice-slot consumption — with live countdowns to each reset.
 
 - A **terminal dashboard** (`get_usage.js`) that renders directly in your shell.
-- A **floating desktop widget** (Electron) that stays on top of your windows. Includes a **system tray icon** with two live bars (Claude session % on top, weekly % on bottom) and a tooltip/menu showing the exact numbers for both providers.
+- A **floating desktop widget** (Electron) that stays on top of your windows. Includes a **system tray icon** with two live bars (Claude session % on top, weekly % on bottom) and a tooltip/menu showing the exact numbers for every provider.
+- An **API Keys tab** in the widget to view, copy, hide/show and add your own keys (stored locally in `config.json`).
 
-No API keys, no tokens, no config files. It reuses the `claude` and `codex` CLI sessions you already have logged in. Codex is optional — if `codex` is not installed, that panel is simply skipped.
+Claude and Codex reuse the CLI sessions you already have logged in (no tokens to paste). ElevenLabs uses an API key you save once in `config.json` (or in the API Keys tab) — see `config.example.json`.
 
 ---
 
@@ -15,15 +16,19 @@ No API keys, no tokens, no config files. It reuses the `claude` and `codex` CLI 
 
 ![Terminal dashboard](screenshots/script.png)
 
-**Floating desktop widget (`npm start`)**
+**Floating desktop widget — Usage tab (`npm start`)**
 
 ![Desktop widget](screenshots/widget.png)
+
+**API Keys tab — view, copy, hide/show and add keys**
+
+![API Keys tab](screenshots/keys.png)
 
 **System tray icon with live bars and tooltip**
 
 ![Tray icon](screenshots/tray.png)
 
-The tray icon sits next to the clock and draws two horizontal bars — Claude's session % on top and weekly % on bottom — so you can see your usage at a glance without opening the widget. Hovering (or right-clicking) shows the full breakdown for both Claude and Codex: session, weekly (all models), weekly (Sonnet), Codex 5-hour limit and Codex weekly.
+The tray icon sits next to the clock and draws two horizontal bars — Claude's session % on top and weekly % on bottom — so you can see your usage at a glance without opening the widget. Hovering (or right-clicking) shows the full breakdown for every provider: Claude session and weekly limits, Codex 5-hour / weekly, and ElevenLabs character usage.
 
 ---
 
@@ -37,15 +42,21 @@ That's it — no scraping of APIs, no tokens handled by the app. If you can run 
 
 ### Configuration
 
-Edit `config.json` in the project root:
+Copy `config.example.json` to `config.json` and edit it:
 
 ```json
 {
-  "refreshMinutes": 15
+  "refreshMinutes": 15,
+  "elevenLabsApiKey": "",
+  "apiKeys": []
 }
 ```
 
-Both the terminal script and the widget (main + renderer) read this file at startup. Restart the tool after changing it.
+- `refreshMinutes` — how often to re-fetch usage (default 15).
+- `elevenLabsApiKey` — optional; without it the ElevenLabs panel is skipped. Can also be supplied via the `ELEVENLABS_API_KEY` env var, or saved through the **API Keys** tab in the widget.
+- `apiKeys` — list of `{name, key}` entries, managed from the widget's **API Keys** tab. Useful to keep your own provider keys handy (with copy/show buttons).
+
+`config.json` is git-ignored so your keys stay local. Both the terminal script and the widget read this file at startup; restart after changing it.
 
 ---
 
@@ -93,16 +104,18 @@ An always-on-top frameless window appears in the top-right corner of your primar
 
 ## Project layout
 
-| File                | Purpose                                                     |
-| ------------------- | ----------------------------------------------------------- |
-| `get_usage.js`      | Standalone terminal dashboard.                              |
-| `fetcher.js`        | One-shot fetcher — runs `claude /usage` and prints JSON.    |
-| `codexFetcher.js`   | One-shot fetcher — runs `codex /status` and prints JSON.    |
-| `main.js`           | Electron main process; spawns both fetchers on a timer.     |
-| `preload.js`        | Electron preload bridging IPC to the renderer.              |
-| `renderer.js`       | Widget UI logic.                                            |
-| `index.html`        | Widget markup.                                              |
-| `styles.css`        | Widget styles.                                              |
+| File                  | Purpose                                                                           |
+| --------------------- | --------------------------------------------------------------------------------- |
+| `get_usage.js`        | Standalone terminal dashboard.                                                    |
+| `fetcher.js`          | One-shot fetcher — runs `claude /usage` and prints JSON.                          |
+| `codexFetcher.js`     | One-shot fetcher — runs `codex /status` and prints JSON.                          |
+| `elevenLabsFetcher.js`| One-shot fetcher — calls `https://api.elevenlabs.io/v1/user/subscription`.        |
+| `main.js`             | Electron main process; spawns the fetchers on a timer and auto-resizes the window.|
+| `preload.js`          | Electron preload bridging IPC to the renderer.                                    |
+| `renderer.js`         | Widget UI logic (Usage + API Keys tabs).                                          |
+| `index.html`          | Widget markup.                                                                    |
+| `styles.css`          | Widget styles.                                                                    |
+| `config.example.json` | Sample config to copy as `config.json`.                                           |
 
 ---
 
