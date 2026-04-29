@@ -71,12 +71,14 @@ const REFRESH_MS = CONFIG.refreshMinutes * 60 * 1000;
 const ELEVEN_KEY = (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim())
   || (typeof CONFIG.elevenLabsApiKey === 'string' ? CONFIG.elevenLabsApiKey.trim() : '')
   || null;
-// Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
-// so a countdown that sits at "Now!" doesn't re-trigger every tick.
-const firedResets = new Set();
 
 // ── ANSI helpers ───────────────────────────────────────────────
-const CLR  = '\x1b[2J\x1b[H';      // clear screen + cursor home
+// Alternate screen buffer keeps live re-renders out of the main scrollback.
+const ALT_ON  = '\x1b[?1049h';
+const ALT_OFF = '\x1b[?1049l';
+const HIDE    = '\x1b[?25l';
+const SHOW    = '\x1b[?25h';
+const CLR     = '\x1b[2J\x1b[H'; // clear screen + cursor home (within alt buffer)
 const BOLD = '\x1b[1m';
 const DIM  = '\x1b[90m';
 const CYAN = '\x1b[36m';
@@ -84,8 +86,6 @@ const YEL  = '\x1b[33m';
 const GRN  = '\x1b[32m';
 const RED  = '\x1b[31m';
 const RST  = '\x1b[0m';
-const HIDE = '\x1b[?25l';
-const SHOW = '\x1b[?25h';
 
 function stripAnsi(str) {
   return str
@@ -379,26 +379,20 @@ function fetchElevenUsage() {
 }
 
 // ── Render dashboard ───────────────────────────────────────────
-function render() {
+function render({ loading = false } = {}) {
   const now = new Date();
   const sep = `${DIM}${'─'.repeat(54)}${RST}`;
   let lines = [];
-  let forceRefresh = false;
-
-  const checkExpired = (section, resetsStr) => {
-    const key = `${section}:${resetsStr}`;
-    if (!firedResets.has(key)) {
-      firedResets.add(key);
-      forceRefresh = true;
-    }
-  };
 
   lines.push('');
   lines.push(`${BOLD}${CYAN}  ☁  AI Usage Dashboard${RST}`);
   lines.push(sep);
 
-  if (!usageData && !codexData && !elevenData) {
+  if (loading) {
     lines.push(`  ${DIM}Fetching usage data...${RST}`);
+    lines.push(sep);
+  } else if (!usageData && !codexData && !elevenData) {
+    lines.push(`  ${DIM}No usage data available.${RST}`);
     lines.push(sep);
   } else {
     if (usageData) {
@@ -408,9 +402,7 @@ function render() {
       if (usageData.session) {
         const d = usageData.session;
         const target = parseResetDate(d.resets);
-        const remaining = target - now;
-        if (remaining <= 0) checkExpired('session', d.resets);
-        const cd = formatCountdown(remaining);
+        const cd = formatCountdown(target - now);
         lines.push(`${BOLD}  Current Session${RST}`);
         lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
@@ -420,9 +412,7 @@ function render() {
       if (usageData.weekAll) {
         const d = usageData.weekAll;
         const target = parseResetDate(d.resets);
-        const remaining = target - now;
-        if (remaining <= 0) checkExpired('weekAll', d.resets);
-        const cd = formatCountdown(remaining);
+        const cd = formatCountdown(target - now);
         lines.push(`${BOLD}  Weekly (All Models)${RST}`);
         lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
@@ -439,9 +429,7 @@ function render() {
       if (usageData.extra) {
         const d = usageData.extra;
         const target = parseResetDate(d.resets);
-        const remaining = target - now;
-        if (remaining <= 0) checkExpired('extra', d.resets);
-        const cd = formatCountdown(remaining);
+        const cd = formatCountdown(target - now);
         lines.push(`${BOLD}  Extra Usage${RST}`);
         lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}$${d.spent} / $${d.total} spent · Resets in:${RST} ${BOLD}${cd}${RST}`);
@@ -463,9 +451,7 @@ function render() {
       if (codexData.session5h) {
         const d = codexData.session5h;
         const target = parseCodexResetDate(d.resets);
-        const remaining = target - now;
-        if (remaining <= 0) checkExpired('codex-5h', d.resets);
-        const cd = formatCountdown(remaining);
+        const cd = formatCountdown(target - now);
         lines.push(`${BOLD}  5h Limit${RST}`);
         lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
@@ -475,9 +461,7 @@ function render() {
       if (codexData.weekly) {
         const d = codexData.weekly;
         const target = parseCodexResetDate(d.resets);
-        const remaining = target - now;
-        if (remaining <= 0) checkExpired('codex-week', d.resets);
-        const cd = formatCountdown(remaining);
+        const cd = formatCountdown(target - now);
         lines.push(`${BOLD}  Weekly Limit${RST}`);
         lines.push(`  ${makeBar(d.pct)}`);
         lines.push(`  ${DIM}Resets in:${RST} ${BOLD}${cd}${RST}`);
@@ -499,7 +483,6 @@ function render() {
       let line = `  ${DIM}${usedStr} / ${limitStr} chars used${RST}`;
       if (elevenData.resetUnix) {
         const remaining = elevenData.resetUnix * 1000 - now.getTime();
-        if (remaining <= 0) checkExpired('eleven-chars', String(elevenData.resetUnix));
         line += ` ${DIM}· Resets in:${RST} ${BOLD}${formatCountdown(remaining)}${RST}`;
       }
       lines.push(line);
@@ -525,11 +508,12 @@ function render() {
   lines.push('');
 
   process.stdout.write(CLR + lines.join('\n'));
-
-  if (forceRefresh && !fetching) refresh();
 }
 
-// ── Main loop ──────────────────────────────────────────────────
+// ── Main ───────────────────────────────────────────────────────
+// Note: fetchUsage() guards itself against re-entry via the shared `fetching`
+// flag, so we don't add a refresh-level guard here (it would clobber that flag
+// before fetchUsage runs and cause it to bail out immediately).
 async function refresh() {
   const [data, codex, eleven] = await Promise.all([
     fetchUsage(),
@@ -543,29 +527,26 @@ async function refresh() {
 }
 
 async function main() {
-  process.stdout.write(HIDE);
-  process.on('SIGINT', () => {
-    process.stdout.write(SHOW + '\n');
-    process.exit(0);
-  });
-  process.on('exit', () => {
-    process.stdout.write(SHOW);
-  });
+  process.stdout.write(ALT_ON + HIDE);
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    process.stdout.write(SHOW + ALT_OFF);
+  };
+  process.on('SIGINT',  () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+  process.on('exit', cleanup);
 
-  // Initial render while fetching
-  render();
-
-  // First fetch
+  render({ loading: true });
   await refresh();
   render();
 
-  // Update display every second (countdowns tick)
+  // Re-render every second so the countdowns tick in real time.
   setInterval(render, 1000);
 
-  // Refresh data every 30 minutes
-  setInterval(async () => {
-    await refresh();
-  }, REFRESH_MS);
+  // Refresh data on the configured cadence (default 15 min, see config.js).
+  setInterval(() => { refresh().then(render); }, REFRESH_MS);
 }
 
 main();
