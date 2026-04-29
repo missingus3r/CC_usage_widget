@@ -1,6 +1,7 @@
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const { execSync } = require('child_process');
 const { loadConfig } = require('./config');
 
@@ -60,11 +61,16 @@ if (!CLAUDE_PATH) {
 const CODEX_PATH = findCodex(); // optional — panel is skipped if missing
 
 // ── State ──────────────────────────────────────────────────────
-let usageData = null;   // parsed data from last fetch (Claude)
-let codexData = null;   // parsed data from last fetch (Codex)
-let lastFetch = null;   // Date of last successful fetch
+const CONFIG = loadConfig();
+let usageData = null;    // parsed data from last fetch (Claude)
+let codexData = null;    // parsed data from last fetch (Codex)
+let elevenData = null;   // parsed data from last fetch (ElevenLabs)
+let lastFetch = null;    // Date of last successful fetch
 let fetching = false;
-const REFRESH_MS = loadConfig().refreshMinutes * 60 * 1000;
+const REFRESH_MS = CONFIG.refreshMinutes * 60 * 1000;
+const ELEVEN_KEY = (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_API_KEY.trim())
+  || (typeof CONFIG.elevenLabsApiKey === 'string' ? CONFIG.elevenLabsApiKey.trim() : '')
+  || null;
 // Tracks `${section}:${resetsString}` pairs we've already force-refreshed for,
 // so a countdown that sits at "Now!" doesn't re-trigger every tick.
 const firedResets = new Set();
@@ -336,6 +342,42 @@ function fetchCodexUsage() {
   });
 }
 
+// Fetch ElevenLabs subscription via REST.
+function fetchElevenUsage() {
+  return new Promise((resolve) => {
+    if (!ELEVEN_KEY) return resolve(null);
+    const req = https.get('https://api.elevenlabs.io/v1/user/subscription', {
+      headers: { 'xi-api-key': ELEVEN_KEY, 'Accept': 'application/json' },
+      timeout: 15000,
+    }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c.toString(); });
+      res.on('end', () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) return resolve(null);
+        try {
+          const sub = JSON.parse(body);
+          const used  = Number(sub.character_count) || 0;
+          const limit = Number(sub.character_limit) || 0;
+          const pct = limit > 0 ? Math.max(0, Math.min(100, Math.round((used / limit) * 100))) : null;
+          resolve({
+            tier: sub.tier || null,
+            characters: { used, limit, pct },
+            voices: {
+              used: typeof sub.voice_slots_used === 'number' ? sub.voice_slots_used : null,
+              limit: typeof sub.voice_limit === 'number' ? sub.voice_limit : null,
+            },
+            resetUnix: typeof sub.next_character_count_reset_unix === 'number'
+              ? sub.next_character_count_reset_unix
+              : null,
+          });
+        } catch { resolve(null); }
+      });
+    });
+    req.on('timeout', () => { try { req.destroy(); } catch {} resolve(null); });
+    req.on('error', () => resolve(null));
+  });
+}
+
 // ── Render dashboard ───────────────────────────────────────────
 function render() {
   const now = new Date();
@@ -355,7 +397,7 @@ function render() {
   lines.push(`${BOLD}${CYAN}  ☁  AI Usage Dashboard${RST}`);
   lines.push(sep);
 
-  if (!usageData && !codexData) {
+  if (!usageData && !codexData && !elevenData) {
     lines.push(`  ${DIM}Fetching usage data...${RST}`);
     lines.push(sep);
   } else {
@@ -443,6 +485,33 @@ function render() {
       }
     }
 
+    if (elevenData && elevenData.characters && elevenData.characters.pct != null) {
+      lines.push(sep);
+      const tier = elevenData.tier ? ` ${DIM}· ${elevenData.tier}${RST}` : '';
+      lines.push(`${BOLD}${CYAN}  ElevenLabs${RST}${tier}`);
+      lines.push('');
+
+      const c = elevenData.characters;
+      lines.push(`${BOLD}  Characters${RST}`);
+      lines.push(`  ${makeBar(c.pct)}`);
+      const usedStr = c.used.toLocaleString();
+      const limitStr = c.limit.toLocaleString();
+      let line = `  ${DIM}${usedStr} / ${limitStr} chars used${RST}`;
+      if (elevenData.resetUnix) {
+        const remaining = elevenData.resetUnix * 1000 - now.getTime();
+        if (remaining <= 0) checkExpired('eleven-chars', String(elevenData.resetUnix));
+        line += ` ${DIM}· Resets in:${RST} ${BOLD}${formatCountdown(remaining)}${RST}`;
+      }
+      lines.push(line);
+      lines.push('');
+
+      if (elevenData.voices && elevenData.voices.limit != null) {
+        const v = elevenData.voices;
+        lines.push(`  ${DIM}Voice slots:${RST} ${BOLD}${v.used ?? 0} / ${v.limit}${RST}`);
+        lines.push('');
+      }
+    }
+
     lines.push(sep);
 
     if (lastFetch) {
@@ -462,13 +531,15 @@ function render() {
 
 // ── Main loop ──────────────────────────────────────────────────
 async function refresh() {
-  const [data, codex] = await Promise.all([
+  const [data, codex, eleven] = await Promise.all([
     fetchUsage(),
     fetchCodexUsage(),
+    fetchElevenUsage(),
   ]);
   if (data) usageData = data;
   if (codex) codexData = codex;
-  if (data || codex) lastFetch = new Date();
+  if (eleven) elevenData = eleven;
+  if (data || codex || eleven) lastFetch = new Date();
 }
 
 async function main() {

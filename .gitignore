@@ -8,3 +8,5 @@ Thumbs.db
 dist/
 out/
 *.log
+config.json
+.claude/

@@ -19,10 +19,31 @@
       </div>
     </div>
 
-    <div class="content" id="content">
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <span>Fetching usage data...</span>
+    <div class="tabs">
+      <button class="tab active" data-tab="usage">Usage</button>
+      <button class="tab" data-tab="keys">API Keys</button>
+    </div>
+
+    <div class="tab-content" id="tab-usage">
+      <div class="content" id="content">
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <span>Fetching usage data...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-keys">
+      <div class="keys-content">
+        <div class="keys-list" id="keys-list"></div>
+
+        <div class="key-add">
+          <div class="key-add-title">Add new key</div>
+          <input id="key-name" class="key-input" placeholder="Name (e.g. OpenAI)" autocomplete="off">
+          <input id="key-value" class="key-input" type="password" placeholder="API key" autocomplete="off">
+          <button id="key-add-btn" class="key-add-btn">+ Add</button>
+          <div class="key-status" id="key-status"></div>
+        </div>
       </div>
     </div>
 

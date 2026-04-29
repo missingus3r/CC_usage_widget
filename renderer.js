@@ -1,6 +1,7 @@
 // ── State ──────────────────────────────────────────────────────
 let usageData = null;
 let codexData = null;
+let elevenData = null;
 let localUsage = null;
 let lastFetch = null;
 let nextFetchAt = null;
@@ -24,6 +25,175 @@ const btnRefresh = document.getElementById('btn-refresh');
 document.getElementById('btn-min').addEventListener('click', () => window.api.minimize());
 document.getElementById('btn-close').addEventListener('click', () => window.api.close());
 btnRefresh.addEventListener('click', () => doFetch());
+
+// ── Auto-resize window to content ──────────────────────────────
+let resizeRaf = null;
+function adjustWindowSize() {
+  if (resizeRaf) cancelAnimationFrame(resizeRaf);
+  resizeRaf = requestAnimationFrame(() => {
+    const widget = document.querySelector('.widget');
+    if (!widget) return;
+    const h = Math.ceil(widget.getBoundingClientRect().height);
+    if (window.api && window.api.resizeContent) window.api.resizeContent(h);
+  });
+}
+
+// ── Tabs ───────────────────────────────────────────────────────
+const tabButtons = document.querySelectorAll('.tab');
+const tabPanels = {
+  usage: document.getElementById('tab-usage'),
+  keys: document.getElementById('tab-keys'),
+};
+tabButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    tabButtons.forEach((b) => b.classList.toggle('active', b === btn));
+    Object.entries(tabPanels).forEach(([name, el]) => {
+      el.classList.toggle('hidden', name !== target);
+    });
+    if (target === 'keys') loadKeys();
+    adjustWindowSize();
+  });
+});
+
+// ── API Keys ───────────────────────────────────────────────────
+let apiKeys = [];
+const keysList = document.getElementById('keys-list');
+const keyNameInput = document.getElementById('key-name');
+const keyValueInput = document.getElementById('key-value');
+const keyAddBtn = document.getElementById('key-add-btn');
+const keyStatus = document.getElementById('key-status');
+
+function maskKey(key) {
+  if (!key) return '';
+  if (key.length <= 8) return '•'.repeat(key.length);
+  return key.slice(0, 4) + '•'.repeat(Math.max(8, key.length - 8)) + key.slice(-4);
+}
+
+function setStatus(msg, kind) {
+  keyStatus.textContent = msg || '';
+  keyStatus.className = 'key-status' + (kind ? ` ${kind}` : '');
+  if (msg) {
+    setTimeout(() => {
+      if (keyStatus.textContent === msg) {
+        keyStatus.textContent = '';
+        keyStatus.className = 'key-status';
+      }
+    }, 2500);
+  }
+}
+
+function renderKeys() {
+  if (!apiKeys.length) {
+    keysList.innerHTML = `<div class="keys-empty">No API keys saved yet.</div>`;
+    adjustWindowSize();
+    return;
+  }
+  keysList.innerHTML = apiKeys.map((k, idx) => {
+    const visible = !!k._visible;
+    const display = visible ? k.key : maskKey(k.key);
+    return `
+      <div class="key-card" data-idx="${idx}">
+        <div class="key-card-head">
+          <span class="key-card-name">${escapeHtml(k.name)}</span>
+          <div class="key-card-actions">
+            <button class="key-icon-btn js-toggle" title="${visible ? 'Hide' : 'Show'}">${visible ? '🙈' : '👁'}</button>
+            <button class="key-icon-btn js-copy" title="Copy">⧉</button>
+            <button class="key-icon-btn danger js-delete" title="Delete">✕</button>
+          </div>
+        </div>
+        <div class="key-value js-value">${escapeHtml(display)}</div>
+      </div>`;
+  }).join('');
+
+  adjustWindowSize();
+
+  keysList.querySelectorAll('.key-card').forEach((card) => {
+    const idx = +card.dataset.idx;
+    card.querySelector('.js-toggle').addEventListener('click', () => {
+      apiKeys[idx]._visible = !apiKeys[idx]._visible;
+      renderKeys();
+    });
+    card.querySelector('.js-copy').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      try {
+        await navigator.clipboard.writeText(apiKeys[idx].key);
+        btn.classList.add('copied');
+        btn.textContent = '✓';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.textContent = '⧉';
+        }, 1200);
+      } catch {
+        setStatus('Copy failed', 'error');
+      }
+    });
+    card.querySelector('.js-delete').addEventListener('click', async () => {
+      apiKeys.splice(idx, 1);
+      await persistKeys();
+      renderKeys();
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+async function loadKeys() {
+  try {
+    const list = await window.api.getApiKeys();
+    apiKeys = (Array.isArray(list) ? list : []).map((k) => ({
+      id: k.id || `k-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: k.name || '',
+      key: k.key || '',
+      _visible: false,
+    }));
+    renderKeys();
+  } catch {
+    apiKeys = [];
+    renderKeys();
+  }
+}
+
+async function persistKeys() {
+  const payload = apiKeys.map(({ id, name, key }) => ({ id, name, key }));
+  try {
+    await window.api.saveApiKeys(payload);
+  } catch {
+    setStatus('Save failed', 'error');
+  }
+}
+
+keyAddBtn.addEventListener('click', async () => {
+  const name = keyNameInput.value.trim();
+  const key = keyValueInput.value.trim();
+  if (!name || !key) {
+    setStatus('Name and key are required', 'error');
+    return;
+  }
+  if (apiKeys.some((k) => k.name.toLowerCase() === name.toLowerCase())) {
+    setStatus('A key with that name already exists', 'error');
+    return;
+  }
+  apiKeys.push({
+    id: `k-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    key,
+    _visible: false,
+  });
+  await persistKeys();
+  keyNameInput.value = '';
+  keyValueInput.value = '';
+  setStatus('Added', 'success');
+  renderKeys();
+});
+
+keyValueInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') keyAddBtn.click();
+});
 
 // ── Reset date parser ──────────────────────────────────────────
 function parseResetDate(resetStr) {
@@ -133,12 +303,12 @@ function fmtNum(n) {
 
 // ── Build sections HTML (static parts) ─────────────────────────
 function buildSections() {
-  if (!usageData && !codexData && !localUsage) return;
+  if (!usageData && !codexData && !elevenData && !localUsage) return;
 
   let html = '';
 
   if (usageData) {
-  html += '<div class="provider-header">Claude</div>';
+  html += '<div class="provider-header">Claude · MAX 5x</div>';
 
   if (usageData.session) {
     html += `
@@ -238,6 +408,39 @@ function buildSections() {
     }
   }
 
+  if (elevenData && elevenData.characters && elevenData.characters.pct != null) {
+    if (usageData || codexData) html += `<div class="divider"></div>`;
+    const tier = elevenData.tier ? ` · ${elevenData.tier}` : '';
+    html += `<div class="provider-header">ElevenLabs${tier}</div>`;
+
+    const c = elevenData.characters;
+    html += `
+      <div class="section">
+        <div class="section-header">
+          <span class="section-label">Characters</span>
+          <span class="section-pct" style="color:${pctColor(c.pct)}">${c.pct}%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill ${barClass(c.pct)}" style="width:${c.pct}%"></div></div>
+        <div class="spent">
+          <span class="spent-value">${fmtNum(c.used)}</span> / ${fmtNum(c.limit)} used
+        </div>
+        ${elevenData.resetUnix ? `<div class="countdown">
+          Resets in <span class="countdown-value" id="cd-eleven">—</span>
+        </div>` : ''}
+      </div>`;
+
+    const v = elevenData.voices;
+    if (v && v.limit != null) {
+      html += `
+        <div class="section">
+          <div class="section-header">
+            <span class="section-label">Voice slots</span>
+            <span class="section-pct" style="color:#a1a1aa">${v.used ?? 0} / ${v.limit}</span>
+          </div>
+        </div>`;
+    }
+  }
+
   if (localUsage) {
     const tokenTotal = (t) => t.input + t.output + t.cacheRead + t.cacheCreate;
 
@@ -299,7 +502,7 @@ function buildSections() {
         </div>`;
     };
 
-    if (usageData || codexData) html += `<div class="divider"></div>`;
+    if (usageData || codexData || elevenData) html += `<div class="divider"></div>`;
     html += `
       <div class="section local-section">
         <div class="section-header">
@@ -312,6 +515,7 @@ function buildSections() {
   }
 
   content.innerHTML = html;
+  adjustWindowSize();
 }
 
 // ── Tick: update countdowns every second ───────────────────────
@@ -358,6 +562,21 @@ function tick() {
   updateCodexSection('session5h', 'cd-codex-5h');
   updateCodexSection('weekly', 'cd-codex-week');
 
+  if (elevenData?.resetUnix) {
+    const el = document.getElementById('cd-eleven');
+    if (el) {
+      const remaining = elevenData.resetUnix * 1000 - now.getTime();
+      el.textContent = fmtCountdown(remaining);
+      if (remaining <= 0) {
+        const key = `eleven:${elevenData.resetUnix}`;
+        if (!firedResets.has(key)) {
+          firedResets.add(key);
+          forceRefresh = true;
+        }
+      }
+    }
+  }
+
   // Footer: next refresh
   if (nextFetchAt) {
     footerNext.textContent = `↻ ${fmtCountdown(nextFetchAt - now)}`;
@@ -392,11 +611,13 @@ async function doFetch() {
 
   let data = null;
   let codex = null;
+  let eleven = null;
   let local = null;
   try {
-    [data, codex, local] = await Promise.all([
+    [data, codex, eleven, local] = await Promise.all([
       window.api.fetchUsage().catch(() => null),
       window.api.fetchCodexUsage().catch(() => null),
+      window.api.fetchElevenUsage().catch(() => null),
       window.api.fetchLocalUsage().catch(() => null),
     ]);
   } finally {
@@ -409,8 +630,12 @@ async function doFetch() {
     codexData = codex;
     window.api.sendCodexUsage(codex);
   }
+  if (eleven && !eleven.error) {
+    elevenData = eleven;
+    window.api.sendElevenUsage(eleven);
+  }
 
-  const gotAny = !!(data || codex);
+  const gotAny = !!(data || codex || (eleven && !eleven.error));
 
   if (data) {
     usageData = data;
@@ -424,7 +649,7 @@ async function doFetch() {
     footerUpdated.textContent = `Updated ${timeStr}`;
     buildSections();
     scheduleNextFetch(REFRESH_MS);
-  } else if (!usageData && !codexData) {
+  } else if (!usageData && !codexData && !elevenData) {
     loading.querySelector('span').textContent = 'Could not fetch data. Retrying...';
     scheduleNextFetch(INITIAL_RETRY_MS);
   } else {
@@ -443,6 +668,8 @@ async function doFetch() {
     if (cfg?.refreshMinutes > 0) REFRESH_MS = cfg.refreshMinutes * 60 * 1000;
   } catch {}
   window.api.onRefresh(() => doFetch());
+  adjustWindowSize();
   doFetch();
   tickInterval = setInterval(tick, 1000);
+  window.addEventListener('load', adjustWindowSize);
 })();

@@ -4,7 +4,7 @@
   box-sizing: border-box;
 }
 
-body {
+html, body {
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   background: transparent;
   color: #e4e4e7;
@@ -20,7 +20,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 /* ── Title bar ────────────────────────────────── */
@@ -81,11 +81,47 @@ body {
 }
 .btn-close:hover { background: rgba(239, 68, 68, 0.5); }
 
+/* ── Tabs ─────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  -webkit-app-region: no-drag;
+}
+
+.tab {
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #71717a;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.tab:hover { color: #d4d4d8; }
+
+.tab.active {
+  color: #e4e4e7;
+  border-bottom-color: #60a5fa;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-content.hidden { display: none; }
+
 /* ── Content ──────────────────────────────────── */
 .content {
-  flex: 1;
   padding: 4px 16px 10px;
-  overflow-y: auto;
 }
 
 /* ── Provider header ──────────────────────────── */
@@ -410,10 +446,157 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-/* ── Scrollbar ────────────────────────────────── */
-.content::-webkit-scrollbar { width: 4px; }
-.content::-webkit-scrollbar-track { background: transparent; }
-.content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+/* ── API Keys panel ───────────────────────────── */
+.keys-content {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 16px 12px;
+  gap: 12px;
 }
+
+.keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.key-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.key-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.key-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e4e4e7;
+  letter-spacing: 0.3px;
+}
+
+.key-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.key-icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: #a1a1aa;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.key-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e4e4e7;
+}
+.key-icon-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+.key-icon-btn.copied {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+
+.key-value {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: #d4d4d8;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 8px;
+  border-radius: 6px;
+  word-break: break-all;
+  user-select: text;
+  cursor: text;
+  letter-spacing: 0.3px;
+}
+
+.keys-empty {
+  font-size: 11.5px;
+  color: #71717a;
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+}
+
+.key-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(96, 165, 250, 0.04);
+  border: 1px dashed rgba(96, 165, 250, 0.2);
+  border-radius: 10px;
+}
+
+.key-add-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.key-input {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e4e4e7;
+  padding: 7px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.key-input:focus {
+  border-color: rgba(96, 165, 250, 0.5);
+}
+.key-input::placeholder {
+  color: #52525b;
+}
+
+.key-add-btn {
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #93c5fd;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.key-add-btn:hover {
+  background: rgba(96, 165, 250, 0.25);
+  color: #e4e4e7;
+}
+
+.key-status {
+  font-size: 11px;
+  color: #71717a;
+  min-height: 14px;
+}
+.key-status.error { color: #ef4444; }
+.key-status.success { color: #4ade80; }
+
+/* ── Scrollbar (hidden — window auto-fits) ────── */
+::-webkit-scrollbar { width: 0; height: 0; }

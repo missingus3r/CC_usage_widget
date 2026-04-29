@@ -2,13 +2,14 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } = require
 const path = require('path');
 const zlib = require('zlib');
 const { spawn } = require('child_process');
-const { loadConfig } = require('./config');
+const { loadConfig, saveConfig } = require('./config');
 const { readLocalUsage } = require('./localUsage');
 
 let win = null;
 let tray = null;
 let latestUsage = null;
 let latestCodex = null;
+let latestEleven = null;
 let isQuitting = false;
 
 // ── PNG encoder (no deps) ──────────────────────────────────────
@@ -120,6 +121,7 @@ function runFetcher(scriptName) {
 
 const fetchUsage = () => runFetcher('fetcher.js');
 const fetchCodexUsage = () => runFetcher('codexFetcher.js');
+const fetchElevenUsage = () => runFetcher('elevenLabsFetcher.js');
 
 // ── Tray ───────────────────────────────────────────────────────
 function updateTray() {
@@ -135,6 +137,9 @@ function updateTray() {
   const cx5 = latestCodex?.session5h?.pct;
   const cxw = latestCodex?.weekly?.pct;
 
+  const elc = latestEleven?.characters;
+  const elPct = elc?.pct;
+
   const tipLines = ['AI Usage'];
   tipLines.push('— Claude —');
   tipLines.push(s != null ? `Session: ${s}%` : 'Session: —');
@@ -145,6 +150,10 @@ function updateTray() {
     tipLines.push('— Codex —');
     if (cx5 != null) tipLines.push(`5h limit: ${cx5}%`);
     if (cxw != null) tipLines.push(`Weekly: ${cxw}%`);
+  }
+  if (elPct != null) {
+    tipLines.push('— ElevenLabs —');
+    tipLines.push(`Chars: ${elPct}% (${elc.used}/${elc.limit})`);
   }
   tray.setToolTip(tipLines.join('\n'));
 
@@ -159,6 +168,11 @@ function updateTray() {
       { label: 'Codex', enabled: false },
       ...(cx5 != null ? [{ label: `  5h limit  ${cx5}%`, enabled: false }] : []),
       ...(cxw != null ? [{ label: `  Weekly  ${cxw}%`, enabled: false }] : []),
+    ] : []),
+    ...(elPct != null ? [
+      { type: 'separator' },
+      { label: `ElevenLabs${latestEleven?.tier ? `  ·  ${latestEleven.tier}` : ''}`, enabled: false },
+      { label: `  Chars  ${elPct}%  (${elc.used}/${elc.limit})`, enabled: false },
     ] : []),
     { type: 'separator' },
     { label: 'Show widget', click: () => showWindow() },
@@ -196,9 +210,10 @@ function createWindow() {
 
   win = new BrowserWindow({
     width: 340,
-    height: 860,
+    height: 300,
     x: screenW - 360,
     y: 20,
+    useContentSize: true,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -225,16 +240,45 @@ function createWindow() {
 // ── IPC ────────────────────────────────────────────────────────
 ipcMain.handle('fetch-usage', () => fetchUsage());
 ipcMain.handle('fetch-codex-usage', () => fetchCodexUsage());
+ipcMain.handle('fetch-eleven-usage', () => fetchElevenUsage());
 ipcMain.handle('fetch-local-usage', () => readLocalUsage());
 ipcMain.handle('get-config', () => loadConfig());
+ipcMain.handle('get-api-keys', () => {
+  const cfg = loadConfig();
+  const list = Array.isArray(cfg.apiKeys) ? cfg.apiKeys.slice() : [];
+  if (cfg.elevenLabsApiKey && !list.some(k => (k.name || '').toLowerCase() === 'elevenlabs')) {
+    list.unshift({ id: 'elevenlabs-legacy', name: 'ElevenLabs', key: cfg.elevenLabsApiKey });
+  }
+  return list;
+});
+ipcMain.handle('save-api-keys', (_event, keys) => {
+  const list = Array.isArray(keys) ? keys.filter(k => k && k.name && k.key) : [];
+  const cfg = loadConfig();
+  const patch = { apiKeys: list };
+  const eleven = list.find(k => (k.name || '').toLowerCase() === 'elevenlabs');
+  if (eleven) patch.elevenLabsApiKey = eleven.key;
+  else if (cfg.elevenLabsApiKey) patch.elevenLabsApiKey = '';
+  saveConfig(patch);
+  return list;
+});
 ipcMain.on('window-minimize', () => { if (win) win.hide(); });
 ipcMain.on('window-close', () => { if (win) win.hide(); });
+ipcMain.on('resize-content', (_event, height) => {
+  if (!win) return;
+  const h = Math.max(220, Math.min(2200, Math.round(Number(height) || 0)));
+  const [w] = win.getContentSize();
+  win.setContentSize(w, h);
+});
 ipcMain.on('usage-updated', (_event, data) => {
   latestUsage = data;
   updateTray();
 });
 ipcMain.on('codex-usage-updated', (_event, data) => {
   latestCodex = data;
+  updateTray();
+});
+ipcMain.on('eleven-usage-updated', (_event, data) => {
+  latestEleven = data;
   updateTray();
 });
 
