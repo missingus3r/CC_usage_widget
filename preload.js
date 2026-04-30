@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('api', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   getApiKeys: () => ipcRenderer.invoke('get-api-keys'),
   saveApiKeys: (keys) => ipcRenderer.invoke('save-api-keys', keys),
+  getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
+  setAutoLaunch: (enabled) => ipcRenderer.invoke('set-auto-launch', enabled),
   minimize: () => ipcRenderer.send('window-minimize'),
   close: () => ipcRenderer.send('window-close'),
   resizeContent: (height) => ipcRenderer.send('resize-content', height),

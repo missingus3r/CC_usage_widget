@@ -11,6 +11,7 @@ let latestUsage = null;
 let latestCodex = null;
 let latestEleven = null;
 let isQuitting = false;
+const startHidden = process.argv.includes('--hidden');
 
 // ── PNG encoder (no deps) ──────────────────────────────────────
 // Builds a 32x32 RGBA PNG with two horizontal bars that reflect
@@ -214,6 +215,7 @@ function createWindow() {
     x: screenW - 360,
     y: 20,
     useContentSize: true,
+    show: !startHidden,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -260,6 +262,24 @@ ipcMain.handle('save-api-keys', (_event, keys) => {
   else if (cfg.elevenLabsApiKey) patch.elevenLabsApiKey = '';
   saveConfig(patch);
   return list;
+});
+ipcMain.handle('get-auto-launch', () => {
+  try {
+    return !!app.getLoginItemSettings({ args: ['--hidden'] }).openAtLogin;
+  } catch {
+    return false;
+  }
+});
+ipcMain.handle('set-auto-launch', (_event, enabled) => {
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: !!enabled,
+      args: ['--hidden'],
+    });
+    return !!app.getLoginItemSettings({ args: ['--hidden'] }).openAtLogin;
+  } catch {
+    return false;
+  }
 });
 ipcMain.on('window-minimize', () => { if (win) win.hide(); });
 ipcMain.on('window-close', () => { if (win) win.hide(); });

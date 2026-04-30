@@ -43,6 +43,7 @@ const tabButtons = document.querySelectorAll('.tab');
 const tabPanels = {
   usage: document.getElementById('tab-usage'),
   keys: document.getElementById('tab-keys'),
+  settings: document.getElementById('tab-settings'),
 };
 tabButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -52,6 +53,7 @@ tabButtons.forEach((btn) => {
       el.classList.toggle('hidden', name !== target);
     });
     if (target === 'keys') loadKeys();
+    if (target === 'settings') loadSettings();
     adjustWindowSize();
   });
 });
@@ -193,6 +195,48 @@ keyAddBtn.addEventListener('click', async () => {
 
 keyValueInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') keyAddBtn.click();
+});
+
+// ── Settings ───────────────────────────────────────────────────
+const autoLaunchCheckbox = document.getElementById('setting-autolaunch');
+const settingStatus = document.getElementById('setting-status');
+
+function setSettingStatus(msg, kind) {
+  settingStatus.textContent = msg || '';
+  settingStatus.className = 'setting-status' + (kind ? ` ${kind}` : '');
+  if (msg) {
+    setTimeout(() => {
+      if (settingStatus.textContent === msg) {
+        settingStatus.textContent = '';
+        settingStatus.className = 'setting-status';
+      }
+    }, 2500);
+  }
+}
+
+async function loadSettings() {
+  try {
+    const enabled = await window.api.getAutoLaunch();
+    autoLaunchCheckbox.checked = !!enabled;
+  } catch {
+    autoLaunchCheckbox.checked = false;
+  }
+}
+
+autoLaunchCheckbox.addEventListener('change', async () => {
+  const desired = autoLaunchCheckbox.checked;
+  try {
+    const actual = await window.api.setAutoLaunch(desired);
+    autoLaunchCheckbox.checked = !!actual;
+    if (actual === desired) {
+      setSettingStatus(desired ? 'Will start at login' : 'Auto-launch disabled', 'success');
+    } else {
+      setSettingStatus('Could not update setting', 'error');
+    }
+  } catch {
+    autoLaunchCheckbox.checked = !desired;
+    setSettingStatus('Could not update setting', 'error');
+  }
 });
 
 // ── Reset date parser ──────────────────────────────────────────

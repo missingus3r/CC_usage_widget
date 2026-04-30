@@ -22,6 +22,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="usage">Usage</button>
       <button class="tab" data-tab="keys">API Keys</button>
+      <button class="tab" data-tab="settings">Settings</button>
     </div>
 
     <div class="tab-content" id="tab-usage">
@@ -44,6 +45,19 @@
           <button id="key-add-btn" class="key-add-btn">+ Add</button>
           <div class="key-status" id="key-status"></div>
         </div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-settings">
+      <div class="settings-content">
+        <label class="setting-row" for="setting-autolaunch">
+          <input type="checkbox" id="setting-autolaunch" class="setting-checkbox">
+          <span class="setting-text">
+            <span class="setting-label">Start at login</span>
+            <span class="setting-desc">Launch the widget automatically when you sign in to Windows.</span>
+          </span>
+        </label>
+        <div class="setting-status" id="setting-status"></div>
       </div>
     </div>
 
